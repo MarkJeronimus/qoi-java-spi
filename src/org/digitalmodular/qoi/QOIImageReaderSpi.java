@@ -11,36 +11,33 @@ import javax.imageio.stream.ImageInputStream;
  */
 // Created 2022-05-14
 public class QOIImageReaderSpi extends ImageReaderSpi {
-	private static final String vendorName = "phoboslab";
-
-	private static final String version = "1.0";
-
-	private static final String[] names = {"qoi", "QOI"};
-
-	private static final String[] suffixes = {"qoi"};
-
-	private static final String[] MIMETypes = {"image/qoi", "image/x-qoi"};
-
-	private static final String readerClassName = "com.sun.imageio.plugins.qoi.QOIImageReader";
-
-	private static final String[] writerSpiNames = {"com.sun.imageio.plugins.qoi.QOIImageWriterSpi"};
+	private static final String   VENDOR_NAME       = "phoboslab";
+	private static final String   VERSION           = "1.0";
+	private static final String[] NAMES             = {"qoi", "QOI"};
+	private static final String[] SUFFIXES          = {"qoi"};
+	private static final String[] MIME_TYPES        = {"image/qoi", "image/x-qoi"};
+	private static final String   READER_CLASS_NAME = "org.digitalmodular.qoi.QOIImageReader";
+	private static final String[] WRITER_SPI_NAMES  = {"org.digitalmodular.qoi.QOIImageWriterSpi"};
 
 	public QOIImageReaderSpi() {
-		super(vendorName,
-		      version,
-		      names,
-		      suffixes,
-		      MIMETypes,
-		      readerClassName,
+		super(VENDOR_NAME,
+		      VERSION,
+		      NAMES,
+		      SUFFIXES,
+		      MIME_TYPES,
+		      READER_CLASS_NAME,
 		      new Class<?>[]{ImageInputStream.class},
-		      writerSpiNames,
+		      WRITER_SPI_NAMES,
 		      false,
-		      null, null,
-		      null, null,
+		      null,
+		      null,
+		      null,
+		      null,
 		      true,
 		      null,
 		      null,
-		      null, null
+		      null,
+		      null
 		);
 	}
 

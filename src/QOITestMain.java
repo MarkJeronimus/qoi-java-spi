@@ -1,5 +1,3 @@
-package org.digitalmodular.qoi;
-
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -13,6 +11,8 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
+
+import org.digitalmodular.qoi.QOIImageReaderSpi;
 
 /**
  * @author Zom-B
@@ -39,6 +39,7 @@ public class QOITestMain extends JPanel {
 		});
 	}
 
+	@SuppressWarnings("OverridableMethodCallDuringObjectConstruction")
 	public QOITestMain(BufferedImage image) {
 		super(null);
 		setBackground(Color.WHITE);

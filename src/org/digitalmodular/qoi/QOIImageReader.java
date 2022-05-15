@@ -1,14 +1,10 @@
 package org.digitalmodular.qoi;
 
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
-import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,17 +17,14 @@ import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 
-import org.jetbrains.annotations.Nullable;
-
 /**
  * @author Zom-B
  */
 // Created 2022-05-14
+@SuppressWarnings({"ConstantConditions", "ReturnOfNull"})
 public class QOIImageReader extends ImageReader {
-	private static final int[][] BAND_OFFSETS = {
-			{0, 1, 2},   // RGB in RGB order
-			{0, 1, 2, 3} // RGBA in RGBA order
-	};
+	@SuppressWarnings("CharUsedInArithmeticContext")
+	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
 
 	private static final int QOI_OP_RGB   = 0b11111110;
 	private static final int QOI_OP_RGBA  = 0b11111111;
@@ -40,26 +33,17 @@ public class QOIImageReader extends ImageReader {
 	private static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
 	private static final int QOI_OP_RUN   = 0b11_000000; // Only upper 2 bits used
 
-	@SuppressWarnings("CharUsedInArithmeticContext")
-	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
-
 	private ImageInputStream stream = null;
 
 	private boolean gotHeader  = false;
 	private int     width      = 0;
 	private int     height     = 0;
 	private int     channels   = 0;
-	private int     colorSpace = 0;
+	private int     colorSpace = 0; // Currently unused
 
-	private @Nullable DataInputStream pixelStream = null;
-
-	private Rectangle sourceRegion = null;
-
-	// The number of source pixels processed
-	int pixelsDone = 0;
-
-	// The total number of pixels in the source image
-	int totalPixels;
+	// State for the progress reports
+	private int pixelsDone  = 0;
+	private int totalPixels = 0;
 
 	private BufferedImage theImage = null;
 
@@ -98,10 +82,6 @@ public class QOIImageReader extends ImageReader {
 			height = stream.readInt();
 			channels = stream.readByte() & 0xFF;
 			colorSpace = stream.readByte() & 0xFF;
-			System.out.println("width     : " + width);
-			System.out.println("height    : " + height);
-			System.out.println("channels  : " + channels);
-			System.out.println("colorSpace: " + colorSpace);
 
 			stream.flushBefore(stream.getStreamPosition());
 
@@ -128,7 +108,7 @@ public class QOIImageReader extends ImageReader {
 	}
 
 	@Override
-	public int getNumImages(boolean allowSearch) throws IOException {
+	public int getNumImages(boolean allowSearch) {
 		if (stream == null) {
 			throw new IllegalStateException("No input source set!");
 		} else if (seekForwardOnly && allowSearch) {
@@ -182,14 +162,12 @@ public class QOIImageReader extends ImageReader {
 	}
 
 	@Override
-	public @Nullable IIOMetadata getStreamMetadata() {
-		System.out.println("getStreamMetadata call");
+	public IIOMetadata getStreamMetadata() {
 		return null;
 	}
 
 	@Override
-	public @Nullable IIOMetadata getImageMetadata(int imageIndex) {
-		System.out.println("getImageMetadata call");
+	public IIOMetadata getImageMetadata(int imageIndex) {
 		return null;
 	}
 
@@ -199,6 +177,7 @@ public class QOIImageReader extends ImageReader {
 			throw new IndexOutOfBoundsException("imageIndex != 0!");
 		}
 
+		//noinspection OverlyBroadCatchBlock
 		try {
 			readImage();
 		} catch (IOException | IllegalStateException | IllegalArgumentException ex) {
@@ -226,8 +205,6 @@ public class QOIImageReader extends ImageReader {
 			 * any other way.
 			 */
 			theImage = getDestination(null, getImageTypes(0), width, height);
-
-			sourceRegion = new Rectangle(0, 0, width, height);
 
 			checkReadParamBandSettings(null, channels, theImage.getSampleModel().getNumBands());
 
@@ -330,6 +307,7 @@ public class QOIImageReader extends ImageReader {
 			}
 
 			if (recordHash) {
+				@SuppressWarnings("OverlyComplexArithmeticExpression")
 				int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 63;
 				colorHashTable[hash][0] = r;
 				colorHashTable[hash][1] = g;
@@ -374,20 +352,6 @@ public class QOIImageReader extends ImageReader {
 		processImageProgress(100.0F * pixelsDone / totalPixels);
 	}
 
-	private WritableRaster createRaster(int width, int height, int channels, int scanlineStride) {
-
-		DataBuffer dataBuffer;
-		Point      origin = new Point(0, 0);
-		dataBuffer = new DataBufferByte(height * scanlineStride);
-
-		return Raster.createInterleavedRaster(dataBuffer,
-		                                      width, height,
-		                                      scanlineStride,
-		                                      channels,
-		                                      BAND_OFFSETS[channels - 3],
-		                                      origin);
-	}
-
 	@Override
 	public void reset() {
 		super.reset();
@@ -400,6 +364,5 @@ public class QOIImageReader extends ImageReader {
 		height = 0;
 		channels = 0;
 		colorSpace = 0;
-		pixelStream = null;
 	}
 }
