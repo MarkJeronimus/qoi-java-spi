@@ -7,7 +7,7 @@ import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 
 /**
- * @author Zom-B
+ * @author Mark Jeronimus
  */
 // Created 2022-05-14
 public class QOIImageReaderSpi extends ImageReaderSpi {

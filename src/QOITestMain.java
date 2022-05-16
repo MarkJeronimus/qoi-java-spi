@@ -15,7 +15,7 @@ import javax.swing.WindowConstants;
 import org.digitalmodular.qoi.QOIImageReaderSpi;
 
 /**
- * @author Zom-B
+ * @author Mark Jeronimus
  */
 // Created 2022-05-14
 public class QOITestMain extends JPanel {
