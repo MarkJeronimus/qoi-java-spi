@@ -62,51 +62,6 @@ public class QOIImageReader extends ImageReader {
 		resetStreamSettings();
 	}
 
-	private void readHeader() throws IIOException {
-		if (gotHeader) {
-			return;
-		}
-
-		if (stream == null) {
-			throw new IllegalStateException("Input source not set!");
-		}
-
-		try {
-			int magic = stream.readInt();
-
-			if (magic != QOI_MAGIC) { // "qoif" in big-endian
-				throw new IIOException("Bad QOIF signature (" + Integer.toString(magic, 16) + ')');
-			}
-
-			width = stream.readInt();
-			height = stream.readInt();
-			channels = stream.readByte() & 0xFF;
-			colorSpace = stream.readByte() & 0xFF;
-
-			stream.flushBefore(stream.getStreamPosition());
-
-			if (width <= 0) {
-				throw new IIOException("Image width <= 0!");
-			} else if (height <= 0) {
-				throw new IIOException("Image height <= 0!");
-			} else if (channels != 3 && channels != 4) {
-				throw new IIOException("'channels' must be 3 or 4!");
-			} else if (colorSpace > 1) {
-				throw new IIOException("'colorSpace' 0 or 1!");
-			}
-
-			if ((long)width * height > Integer.MAX_VALUE - 2) {
-				// We are not able to properly decode image that has number
-				// of pixels greater than Integer.MAX_VALUE - 2
-				throw new IIOException("Image of the size " + width + " by " + height + " has too many pixels");
-			}
-
-			gotHeader = true;
-		} catch (IOException ex) {
-			throw new IIOException("I/O error reading QOI header!", ex);
-		}
-	}
-
 	@Override
 	public int getNumImages(boolean allowSearch) {
 		if (stream == null) {
@@ -191,29 +146,14 @@ public class QOIImageReader extends ImageReader {
 
 	private void readImage() throws IIOException {
 		try {
-			/*
-			 * Here we may fail to allocate a buffer for destination
-			 * image due to memory limitation.
-			 *
-			 * If the read operation triggers OutOfMemoryError, the same
-			 * will be wrapped in an IIOException at QOIImageReader.read
-			 * method.
-			 *
-			 * The recovery strategy for this case should be defined at
-			 * the application level, so we will not try to estimate
-			 * the required amount of the memory and/or handle OOM in
-			 * any other way.
-			 */
-			theImage = getDestination(null, getImageTypes(0), width, height);
-
-			checkReadParamBandSettings(null, channels, theImage.getSampleModel().getNumBands());
-
 			clearAbortRequest();
 			processImageStarted(0);
 			if (abortRequested()) {
 				processReadAborted();
 			} else {
+				readHeader();
 				decodeImage();
+
 				if (abortRequested()) {
 					processReadAborted();
 				} else {
@@ -225,7 +165,58 @@ public class QOIImageReader extends ImageReader {
 		}
 	}
 
+	private void readHeader() throws IIOException {
+		if (gotHeader) {
+			return;
+		}
+
+		if (stream == null) {
+			throw new IllegalStateException("Input source not set!");
+		}
+
+		try {
+			int magic = stream.readInt();
+
+			if (magic != QOIImageWriter.QOI_MAGIC) { // "qoif" in big-endian
+				throw new IIOException("Bad QOIF signature (" + Integer.toString(magic, 16) + ')');
+			}
+
+			width = stream.readInt();
+			height = stream.readInt();
+			channels = stream.readByte() & 0xFF;
+			colorSpace = stream.readByte() & 0xFF;
+
+			stream.flushBefore(stream.getStreamPosition());
+
+			if (width <= 0) {
+				throw new IIOException("Image width <= 0!");
+			} else if (height <= 0) {
+				throw new IIOException("Image height <= 0!");
+			} else if (channels != 3 && channels != 4) {
+				throw new IIOException("'channels' must be 3 or 4!");
+			} else if (colorSpace > 1) {
+				throw new IIOException("'colorSpace' 0 or 1!");
+			}
+
+			if ((long)width * height > Integer.MAX_VALUE - 2) {
+				// We are not able to properly decode image that has number
+				// of pixels greater than Integer.MAX_VALUE - 2
+				throw new IIOException("Image of the size " + width + " by " + height + " has too many pixels");
+			}
+
+			gotHeader = true;
+		} catch (IOException ex) {
+			throw new IIOException("I/O error reading QOI header!", ex);
+		}
+	}
+
 	private void decodeImage() throws IOException {
+		// Construct a suitable target image
+		theImage = getDestination(null, getImageTypes(0), width, height);
+
+		checkReadParamBandSettings(null, channels, theImage.getSampleModel().getNumBands());
+
+		// Calculate target for progress notification
 		pixelsDone = 0;
 		totalPixels = width * height;
 		int totalBytes = totalPixels;
