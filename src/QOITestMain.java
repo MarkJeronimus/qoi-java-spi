@@ -22,9 +22,9 @@ public class QOITestMain extends JPanel {
 	private final BufferedImage image;
 
 	public static void main(String... args) throws IOException {
-		String filename = "qoi_test_images/dice.qoi";
-
 		IIORegistry.getDefaultInstance().registerServiceProvider(new QOIImageReaderSpi());
+
+		String filename = "qoi_test_images/dice.qoi";
 		BufferedImage image = ImageIO.read(new File(filename));
 
 		SwingUtilities.invokeLater(() -> {

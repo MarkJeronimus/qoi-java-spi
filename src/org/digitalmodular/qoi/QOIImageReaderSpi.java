@@ -13,7 +13,7 @@ import javax.imageio.stream.ImageInputStream;
 public class QOIImageReaderSpi extends ImageReaderSpi {
 	private static final String   VENDOR_NAME       = "phoboslab";
 	private static final String   VERSION           = "1.0";
-	private static final String[] NAMES             = {"qoi", "QOI"};
+	private static final String[] FORMAT_NAMES      = {"qoi", "QOI"};
 	private static final String[] SUFFIXES          = {"qoi"};
 	private static final String[] MIME_TYPES        = {"image/qoi", "image/x-qoi"};
 	private static final String   READER_CLASS_NAME = "org.digitalmodular.qoi.QOIImageReader";
@@ -22,7 +22,7 @@ public class QOIImageReaderSpi extends ImageReaderSpi {
 	public QOIImageReaderSpi() {
 		super(VENDOR_NAME,
 		      VERSION,
-		      NAMES,
+		      FORMAT_NAMES,
 		      SUFFIXES,
 		      MIME_TYPES,
 		      READER_CLASS_NAME,
@@ -33,7 +33,7 @@ public class QOIImageReaderSpi extends ImageReaderSpi {
 		      null,
 		      null,
 		      null,
-		      true,
+		      false,
 		      null,
 		      null,
 		      null,

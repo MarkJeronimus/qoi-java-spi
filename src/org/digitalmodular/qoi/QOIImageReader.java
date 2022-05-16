@@ -42,8 +42,10 @@ public class QOIImageReader extends ImageReader {
 	private int     colorSpace = 0; // Currently unused
 
 	// State for the progress reports
-	private int pixelsDone  = 0;
+	/* Number of pixels to read */
 	private int totalPixels = 0;
+	/* Number of pixels read */
+	private int pixelsDone  = 0;
 
 	private BufferedImage theImage = null;
 
@@ -52,9 +54,7 @@ public class QOIImageReader extends ImageReader {
 	}
 
 	@Override
-	public void setInput(Object input,
-	                     boolean seekForwardOnly,
-	                     boolean ignoreMetadata) {
+	public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
 		super.setInput(input, seekForwardOnly, ignoreMetadata);
 		stream = (ImageInputStream)input; // Always works
 
@@ -134,18 +134,6 @@ public class QOIImageReader extends ImageReader {
 
 		//noinspection OverlyBroadCatchBlock
 		try {
-			readImage();
-		} catch (IOException | IllegalStateException | IllegalArgumentException ex) {
-			throw ex;
-		} catch (Throwable ex) {
-			throw new IIOException("Unexpected exception during read: ", ex);
-		}
-
-		return theImage;
-	}
-
-	private void readImage() throws IIOException {
-		try {
 			clearAbortRequest();
 			processImageStarted(0);
 			if (abortRequested()) {
@@ -160,9 +148,15 @@ public class QOIImageReader extends ImageReader {
 					processImageComplete();
 				}
 			}
+		} catch (IllegalArgumentException | IllegalStateException ex) {
+			throw ex;
 		} catch (IOException ex) {
-			throw new IIOException("Error reading QOI image data", ex);
+			throw new IIOException("I/O error reading QOI image data", ex);
+		} catch (Throwable ex) {
+			throw new IIOException("Unexpected exception during read", ex);
 		}
+
+		return theImage;
 	}
 
 	private void readHeader() throws IIOException {
@@ -216,25 +210,25 @@ public class QOIImageReader extends ImageReader {
 
 		checkReadParamBandSettings(null, channels, theImage.getSampleModel().getNumBands());
 
-		// Calculate target for progress notification
-		pixelsDone = 0;
+		// Prepare progress notification variables
 		totalPixels = width * height;
+		pixelsDone = 0;
+
+		int lineStride = width;
 		int totalBytes = totalPixels;
 
 		WritableRaster raster = theImage.getWritableTile(0, 0);
 
 		byte[] bytePixels = null;
 		int[]  intPixels  = null;
-		int    lineStride;
 
 		DataBuffer dataBuffer = raster.getDataBuffer();
 		if (dataBuffer.getDataType() == DataBuffer.TYPE_BYTE) {
 			bytePixels = ((DataBufferByte)dataBuffer).getData();
-			lineStride = width * channels;
+			lineStride *= channels;
 			totalBytes *= channels;
 		} else {
 			intPixels = ((DataBufferInt)dataBuffer).getData();
-			lineStride = width;
 		}
 
 		byte     r              = 0;
@@ -245,16 +239,20 @@ public class QOIImageReader extends ImageReader {
 
 		processPassStarted(theImage, 0, 0, 0, 0, 0, 1, 1, null);
 
-		// Notify image observers once per row (without the notifications, we wouldn't need a separate loop for x and y)
-		int nextUpdate = lineStride;
+		// Notify image observers once per row
+		int nextUpdate = 0;
 		updateImageProgress(0);
 
 		int p = 0;
 		while (p < totalBytes) {
+			if (p >= nextUpdate) {
+				nextUpdate += lineStride;
+				updateImageProgress(width);
 
 			// If read has been aborted, just return. processReadAborted will be called later
 			if (abortRequested()) {
-				return;
+					break;
+				}
 			}
 
 			int     runLength  = 1;
@@ -328,11 +326,6 @@ public class QOIImageReader extends ImageReader {
 					runLength--;
 				} while (runLength > 0);
 			}
-
-			if (p >= nextUpdate) {
-				nextUpdate += lineStride;
-				updateImageProgress(width);
-			}
 		}
 
 		processPassComplete(theImage);
@@ -340,7 +333,7 @@ public class QOIImageReader extends ImageReader {
 
 	private void updateImageProgress(int newPixels) {
 		pixelsDone += newPixels;
-		processImageProgress(100.0F * pixelsDone / totalPixels);
+		processImageProgress(pixelsDone * 100.0f / totalPixels);
 	}
 
 	@Override
