@@ -151,11 +151,20 @@ public final class QOIImageWriter extends ImageWriter {
 		nextUpdateAt = 0;
 
 		ColorModel colorModel  = image.getColorModel();
-		int        srcChannels = image.getSampleModel().getSampleSize().length;
+		int[]      sampleSizes = image.getSampleModel().getSampleSize();
+		int        srcChannels = sampleSizes.length;
 
-		if (colorModel instanceof DirectColorModel) {
+		boolean byteSamples = true;
+		for (int sampleSize : sampleSizes) {
+			if (sampleSize != 8) {
+				byteSamples = false;
+				break;
+			}
+		}
+
+		if (byteSamples && colorModel instanceof DirectColorModel) {
 			encodeDirectColorModelImage(image.getData(), srcChannels);
-		} else if (colorModel instanceof ComponentColorModel) {
+		} else if (byteSamples && colorModel instanceof ComponentColorModel) {
 			encodeComponentColorModelImage(image.getData(), srcChannels);
 		} else {
 			encodeIncompatibleImage(image);
@@ -178,6 +187,7 @@ public final class QOIImageWriter extends ImageWriter {
 
 	private void encodeDirectColorModelImage(Raster raster, int srcChannels) throws IOException {
 		int[] pixels     = ((DataBufferInt)raster.getDataBuffer()).getData();
+		int[] bitOffsets = ((SinglePixelPackedSampleModel)raster.getSampleModel()).getBitOffsets();
 		int   lineStride = width * channels;
 
 		if (srcChannels == 3 && channels == 3) {
@@ -187,9 +197,9 @@ public final class QOIImageWriter extends ImageWriter {
 				}
 
 				int pixel = pixels[i];
-				int r     = (pixel >> 16) & 0xFF;
-				int g     = (pixel >> 8) & 0xFF;
-				int b     = pixel & 0xFF;
+				int r     = (pixel >> bitOffsets[0]) & 0xFF;
+				int g     = (pixel >> bitOffsets[1]) & 0xFF;
+				int b     = (pixel >> bitOffsets[2]) & 0xFF;
 				encodeColor(r, g, b, 255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
@@ -199,10 +209,10 @@ public final class QOIImageWriter extends ImageWriter {
 				}
 
 				int pixel = pixels[i];
-				int a     = (pixel >> 24) & 0xFF;
-				int r     = (pixel >> 16) & 0xFF;
-				int g     = (pixel >> 8) & 0xFF;
-				int b     = pixel & 0xFF;
+				int r     = (pixel >> bitOffsets[0]) & 0xFF;
+				int g     = (pixel >> bitOffsets[1]) & 0xFF;
+				int b     = (pixel >> bitOffsets[2]) & 0xFF;
+				int a     = (pixel >> bitOffsets[3]) & 0xFF;
 				encodeColor(r, g, b, a);
 			}
 		} else if (channels == 4) {
@@ -216,9 +226,10 @@ public final class QOIImageWriter extends ImageWriter {
 
 	@SuppressWarnings("ValueOfIncrementOrDecrementUsed")
 	private void encodeComponentColorModelImage(Raster raster, int srcChannels) throws IOException {
-		byte[] samples    = ((DataBufferByte)raster.getDataBuffer()).getData();
-		int    lineStride = width * channels;
-		int    p          = 0;
+		byte[] samples     = ((DataBufferByte)raster.getDataBuffer()).getData();
+		int[]  bandOffsets = ((ComponentSampleModel)raster.getSampleModel()).getBandOffsets();
+		int    lineStride  = width * channels;
+		int    p           = 0;
 
 		if (srcChannels == 1 && channels == 3) {
 			while (p < samples.length) {
@@ -235,8 +246,9 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int y = samples[p++];
-				int a = samples[p++];
+				int y = samples[p + bandOffsets[0]];
+				int a = samples[p + bandOffsets[1]];
+				p += 2;
 				encodeColor(y, y, y, a);
 			}
 		} else if (srcChannels == 3 && channels == 3) {
@@ -245,9 +257,10 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int r = samples[p++];
-				int g = samples[p++];
-				int b = samples[p++];
+				int r = samples[p + bandOffsets[0]];
+				int g = samples[p + bandOffsets[1]];
+				int b = samples[p + bandOffsets[2]];
+				p += 3;
 				encodeColor(r, g, b, 255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
@@ -256,10 +269,11 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int r = samples[p++];
-				int g = samples[p++];
-				int b = samples[p++];
-				int a = samples[p++];
+				int r = samples[p + bandOffsets[0]];
+				int g = samples[p + bandOffsets[1]];
+				int b = samples[p + bandOffsets[2]];
+				int a = samples[p + bandOffsets[3]];
+				p += 4;
 				encodeColor(r, g, b, a);
 			}
 		} else if (channels == 4) {
