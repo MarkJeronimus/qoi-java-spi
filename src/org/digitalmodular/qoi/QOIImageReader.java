@@ -23,14 +23,6 @@ import javax.imageio.stream.ImageInputStream;
 // Created 2022-05-14
 @SuppressWarnings({"ConstantConditions", "ReturnOfNull"})
 public class QOIImageReader extends ImageReader {
-
-	private static final int QOI_OP_RGB   = 0b11111110;
-	private static final int QOI_OP_RGBA  = 0b11111111;
-	private static final int QOI_OP_INDEX = 0b00_000000; // Only upper 2 bits used
-	private static final int QOI_OP_DIFF  = 0b01_000000; // Only upper 2 bits used
-	private static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
-	private static final int QOI_OP_RUN   = 0b11_000000; // Only upper 2 bits used
-
 	private ImageInputStream stream = null;
 
 	private boolean gotHeader  = false;
@@ -252,11 +244,11 @@ public class QOIImageReader extends ImageReader {
 			int code = stream.read();
 			if (code < 0) {
 				break; // EOF reached
-			} else if (code == QOI_OP_RGB) {
+			} else if (code == QOIImageWriter.QOI_OP_RGB) {
 				r = (byte)stream.read();
 				g = (byte)stream.read();
 				b = (byte)stream.read();
-			} else if (code == QOI_OP_RGBA) {
+			} else if (code == QOIImageWriter.QOI_OP_RGBA) {
 				r = (byte)stream.read();
 				g = (byte)stream.read();
 				b = (byte)stream.read();
@@ -264,7 +256,7 @@ public class QOIImageReader extends ImageReader {
 			} else {
 				int op2 = code & 0b11000000;
 
-				if (op2 == QOI_OP_INDEX) {
+				if (op2 == QOIImageWriter.QOI_OP_INDEX) {
 					code &= 0b00111111;
 					byte[] c = colorHashTable[code];
 					r = c[0];
@@ -272,11 +264,11 @@ public class QOIImageReader extends ImageReader {
 					b = c[2];
 					a = c[3];
 					recordHash = false;
-				} else if (op2 == QOI_OP_DIFF) {
+				} else if (op2 == QOIImageWriter.QOI_OP_DIFF) {
 					r += (code >> 4 & 0b00000011) - 2;
 					g += (code >> 2 & 0b00000011) - 2;
 					b += (code & 0b00000011) - 2;
-				} else if (op2 == QOI_OP_LUMA) {
+				} else if (op2 == QOIImageWriter.QOI_OP_LUMA) {
 					int dg = (code & 0b00111111) - 32;
 					g += dg;
 					code = stream.read();

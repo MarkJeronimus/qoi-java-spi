@@ -5,11 +5,13 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.ComponentColorModel;
+import java.awt.image.ComponentSampleModel;
 import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
 import java.awt.image.DirectColorModel;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
+import java.awt.image.SinglePixelPackedSampleModel;
 import java.io.IOException;
 import java.util.Objects;
 import javax.imageio.IIOException;
@@ -30,12 +32,28 @@ public final class QOIImageWriter extends ImageWriter {
 	@SuppressWarnings("CharUsedInArithmeticContext")
 	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
 
+	static final int QOI_OP_RGB   = 0b11111110;
+	static final int QOI_OP_RGBA  = 0b11111111;
+	static final int QOI_OP_INDEX = 0b00_000000; // Only upper 2 bits used
+	static final int QOI_OP_DIFF  = 0b01_000000; // Only upper 2 bits used
+	static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
+	static final int QOI_OP_RUN   = 0b11_000000; // Only upper 2 bits used
+
 	private ImageOutputStream stream = null;
 
+	// QOI header data
 	private int width      = 0;
 	private int height     = 0;
 	private int channels   = 0;
 	private int colorSpace = 0; // Currently unused
+
+	// QOI encoder state
+	private       int     repeatCount    = 0;
+	private       int     lastR          = 0;
+	private       int     lastG          = 0;
+	private       int     lastB          = 0;
+	private       int     lastA          = 255;
+	private final int[][] colorHashTable = new int[64][4];
 
 	// State for the progress reports
 	/** Number of pixels to read */
@@ -107,6 +125,11 @@ public final class QOIImageWriter extends ImageWriter {
 		height = renderedImage.getHeight();
 		channels = hasAlpha ? 4 : 3;
 		colorSpace = 0;
+		repeatCount = 0;
+		lastR = 0;
+		lastG = 0;
+		lastB = 0;
+		lastA = 255;
 
 		if (channels < 1 || channels > 4) {
 			throw new UnsupportedOperationException("Cannot encode image with " + channels + " channels");
@@ -120,6 +143,7 @@ public final class QOIImageWriter extends ImageWriter {
 			} else {
 				writeHeader();
 				encodeImage(renderedImage);
+				writeFooter();
 
 				if (abortRequested()) {
 					processWriteAborted();
@@ -286,11 +310,112 @@ public final class QOIImageWriter extends ImageWriter {
 	}
 
 	private void encodeColor(int r, int g, int b, int a) throws IOException {
-		//TODO
+		@SuppressWarnings("OverlyComplexArithmeticExpression")
+		int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 63;
+
+		if (lastR == r &&
+		    lastG == g &&
+		    lastB == b &&
+		    lastA == a) {
+			repeatCount++;
+			if (repeatCount == 62) {
+				saveOpRun();
+			}
+		} else {
+			if (repeatCount != 0) {
+				saveOpRun();
+			}
+
+			if (colorHashTable[hash][0] == r &&
+			    colorHashTable[hash][1] == g &&
+			    colorHashTable[hash][2] == b &&
+			    colorHashTable[hash][3] == a) {
+				saveOpIndex(hash);
+			} else if (lastA != a) {
+				saveOpRGBA(r, g, b, a);
+			} else {
+				int dr = r - lastR;
+				int dg = g - lastG;
+				int db = b - lastB;
+
+				if (dr >= -2 && dr < 2 &&
+				    dg >= -2 && dg < 2 &&
+				    db >= -2 && db < 2) {
+					saveOpDiff(dr, dg, db);
+				} else {
+					dr -= dg;
+					db -= dg;
+
+					if (dr >= -8 && dr < 8 &&
+					    dg >= -32 && dg < 32 &&
+					    db >= -8 && db < 8) {
+						saveOpLuma(dr, dg, db);
+					} else {
+						saveOpRGB(r, g, b);
+					}
+				}
+			}
+		}
+
+		lastR = r;
+		lastG = g;
+		lastB = b;
+		lastA = a;
+
+		colorHashTable[hash][0] = r;
+		colorHashTable[hash][1] = g;
+		colorHashTable[hash][2] = b;
+		colorHashTable[hash][3] = a;
+	}
+
+	private void saveOpRGB(int r, int g, int b) throws IOException {
+		stream.writeByte(QOI_OP_RGB);
+		stream.writeByte(r);
+		stream.writeByte(g);
+		stream.writeByte(b);
+	}
+
+	private void saveOpRGBA(int r, int g, int b, int a) throws IOException {
+		stream.writeByte(QOI_OP_RGBA);
 		stream.writeByte(r);
 		stream.writeByte(g);
 		stream.writeByte(b);
 		stream.writeByte(a);
+	}
+
+	private void saveOpIndex(int index) throws IOException {
+		stream.writeByte(QOI_OP_INDEX | index);
+	}
+
+	private void saveOpDiff(int dr, int dg, int db) throws IOException {
+		stream.writeByte(QOI_OP_DIFF | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2));
+	}
+
+	private void saveOpLuma(int dr, int dg, int db) throws IOException {
+		stream.writeByte(QOI_OP_LUMA | (dg + 32));
+		stream.writeByte((dr + 8) << 4 | (db + 8));
+	}
+
+	private void saveOpRun() throws IOException {
+		stream.writeByte(QOI_OP_RUN | (repeatCount - 1));
+		repeatCount = 0;
+	}
+
+	private void writeFooter() throws IOException {
+		if (repeatCount > 0) {
+			saveOpRun();
+		}
+
+		// The stream's end marker (I have no idea why this exists)
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x00);
+		stream.writeByte(0x01);
+
 	}
 
 	private boolean checkUpdateAndAbort(int progressPosition, int progressInterval) {
