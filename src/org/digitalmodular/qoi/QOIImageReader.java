@@ -40,10 +40,12 @@ public class QOIImageReader extends ImageReader {
 	private int     colorSpace = 0; // Currently unused
 
 	// State for the progress reports
-	/* Number of pixels to read */
-	private int totalPixels = 0;
-	/* Number of pixels read */
-	private int pixelsDone  = 0;
+	/** Number of pixels to read */
+	private int totalPixels  = 0;
+	/** Number of pixels read */
+	private int pixelsDone   = 0;
+	/** Notify image observers once per this amount of work */
+	private int nextUpdateAt = 0;
 
 	private BufferedImage theImage = null;
 
@@ -211,6 +213,7 @@ public class QOIImageReader extends ImageReader {
 		// Prepare progress notification variables
 		totalPixels = width * height;
 		pixelsDone = 0;
+		nextUpdateAt = 0;
 
 		int lineStride   = width;
 		int totalSamples = totalPixels;
@@ -237,20 +240,10 @@ public class QOIImageReader extends ImageReader {
 
 		processPassStarted(theImage, 0, 0, 0, 0, 0, 1, 1, null);
 
-		// Notify image observers once per row
-		int nextUpdate = 0;
-		updateImageProgress(0);
-
 		int p = 0;
 		while (p < totalSamples) {
-			if (p >= nextUpdate) {
-				nextUpdate += lineStride;
-				updateImageProgress(width);
-
-				// If read has been aborted, just return. processReadAborted will be called later
-				if (abortRequested()) {
-					break;
-				}
+			if (checkUpdateAndAbort(p, lineStride)) {
+				break;
 			}
 
 			int     runLength  = 1;
@@ -337,9 +330,17 @@ public class QOIImageReader extends ImageReader {
 		processPassComplete(theImage);
 	}
 
-	private void updateImageProgress(int newPixels) {
-		pixelsDone += newPixels;
-		processImageProgress(pixelsDone * 100.0f / totalPixels);
+	private boolean checkUpdateAndAbort(int progressPosition, int progressInterval) {
+		if (progressPosition >= nextUpdateAt) {
+			nextUpdateAt += progressInterval;
+
+			pixelsDone += width;
+			processImageProgress(pixelsDone * 100.0f / totalPixels);
+
+			// If read has been aborted, just return. processReadAborted will be called later
+			return abortRequested();
+		}
+		return false;
 	}
 
 	@Override

@@ -38,10 +38,12 @@ public final class QOIImageWriter extends ImageWriter {
 	private int colorSpace = 0; // Currently unused
 
 	// State for the progress reports
-	/* Number of pixels to write */
-	private int totalPixels = 0;
-	/* Number of pixels written */
-	private int pixelsDone  = 0;
+	/** Number of pixels to read */
+	private int totalPixels  = 0;
+	/** Number of pixels read */
+	private int pixelsDone   = 0;
+	/** Notify image observers once per this amount of work */
+	private int nextUpdateAt = 0;
 
 	public QOIImageWriter(ImageWriterSpi originatingProvider) {
 		super(originatingProvider);
@@ -146,6 +148,7 @@ public final class QOIImageWriter extends ImageWriter {
 		// Prepare progress notification variables
 		totalPixels = width * height;
 		pixelsDone = 0;
+		nextUpdateAt = 0;
 
 		ColorModel colorModel  = image.getColorModel();
 		int        srcChannels = image.getSampleModel().getSampleSize().length;
@@ -157,17 +160,6 @@ public final class QOIImageWriter extends ImageWriter {
 		} else {
 			encodeIncompatibleImage(image);
 		}
-
-//		for (int y = 0; y < height; y++) {
-//			updateImageProgress(width);
-//
-//			// If write has been aborted, just return. processReadAborted will be called later
-//			if (abortRequested()) {
-//				break;
-//			}
-//
-//			raster.getPixels(0, y, width, 1, samples);
-//		}
 	}
 
 	private void encodeIncompatibleImage(RenderedImage image) throws IOException {
@@ -185,21 +177,32 @@ public final class QOIImageWriter extends ImageWriter {
 	}
 
 	private void encodeDirectColorModelImage(Raster raster, int srcChannels) throws IOException {
-		int[] pixels = ((DataBufferInt)raster.getDataBuffer()).getData();
+		int[] pixels     = ((DataBufferInt)raster.getDataBuffer()).getData();
+		int   lineStride = width * channels;
 
 		if (srcChannels == 3 && channels == 3) {
-			for (int pixel : pixels) {
-				int r = (pixel >> 16) & 0xFF;
-				int g = (pixel >> 8) & 0xFF;
-				int b = pixel & 0xFF;
+			for (int i = 0; i < pixels.length; i++) {
+				if (checkUpdateAndAbort(i, lineStride)) {
+					break;
+				}
+
+				int pixel = pixels[i];
+				int r     = (pixel >> 16) & 0xFF;
+				int g     = (pixel >> 8) & 0xFF;
+				int b     = pixel & 0xFF;
 				encodeColor(r, g, b, 255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
-			for (int pixel : pixels) {
-				int a = (pixel >> 24) & 0xFF;
-				int r = (pixel >> 16) & 0xFF;
-				int g = (pixel >> 8) & 0xFF;
-				int b = pixel & 0xFF;
+			for (int i = 0; i < pixels.length; i++) {
+				if (checkUpdateAndAbort(i, lineStride)) {
+					break;
+				}
+
+				int pixel = pixels[i];
+				int a     = (pixel >> 24) & 0xFF;
+				int r     = (pixel >> 16) & 0xFF;
+				int g     = (pixel >> 8) & 0xFF;
+				int b     = pixel & 0xFF;
 				encodeColor(r, g, b, a);
 			}
 		} else if (channels == 4) {
@@ -211,34 +214,52 @@ public final class QOIImageWriter extends ImageWriter {
 		}
 	}
 
+	@SuppressWarnings("ValueOfIncrementOrDecrementUsed")
 	private void encodeComponentColorModelImage(Raster raster, int srcChannels) throws IOException {
-		byte[] samples = ((DataBufferByte)raster.getDataBuffer()).getData();
-
-		int i = 0;
+		byte[] samples    = ((DataBufferByte)raster.getDataBuffer()).getData();
+		int    lineStride = width * channels;
+		int    p          = 0;
 
 		if (srcChannels == 1 && channels == 3) {
-			for (int sample : samples) {
+			while (p < samples.length) {
+				if (checkUpdateAndAbort(p, lineStride)) {
+					break;
+				}
+
+				int sample = samples[p++];
 				encodeColor(sample, sample, sample, 255);
 			}
 		} else if (srcChannels == 2 && channels == 4) {
-			while (i < samples.length) {
-				int y = samples[i++];
-				int a = samples[i++];
+			while (p < samples.length) {
+				if (checkUpdateAndAbort(p, lineStride)) {
+					break;
+				}
+
+				int y = samples[p++];
+				int a = samples[p++];
 				encodeColor(y, y, y, a);
 			}
 		} else if (srcChannels == 3 && channels == 3) {
-			while (i < samples.length) {
-				int r = samples[i++];
-				int g = samples[i++];
-				int b = samples[i++];
+			while (p < samples.length) {
+				if (checkUpdateAndAbort(p, lineStride)) {
+					break;
+				}
+
+				int r = samples[p++];
+				int g = samples[p++];
+				int b = samples[p++];
 				encodeColor(r, g, b, 255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
-			while (i < samples.length) {
-				int r = samples[i++];
-				int g = samples[i++];
-				int b = samples[i++];
-				int a = samples[i++];
+			while (p < samples.length) {
+				if (checkUpdateAndAbort(p, lineStride)) {
+					break;
+				}
+
+				int r = samples[p++];
+				int g = samples[p++];
+				int b = samples[p++];
+				int a = samples[p++];
 				encodeColor(r, g, b, a);
 			}
 		} else if (channels == 4) {
@@ -258,8 +279,16 @@ public final class QOIImageWriter extends ImageWriter {
 		stream.writeByte(a);
 	}
 
-	private void updateImageProgress(int newPixels) {
-		pixelsDone += newPixels;
-		processImageProgress(pixelsDone * 100.0f / totalPixels);
+	private boolean checkUpdateAndAbort(int progressPosition, int progressInterval) {
+		if (progressPosition >= nextUpdateAt) {
+			nextUpdateAt += progressInterval;
+
+			pixelsDone += width;
+			processImageProgress(pixelsDone * 100.0f / totalPixels);
+
+			// If read has been aborted, just return. processReadAborted will be called later
+			return abortRequested();
+		}
+		return false;
 	}
 }
