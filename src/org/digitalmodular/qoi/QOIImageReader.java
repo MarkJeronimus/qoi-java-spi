@@ -214,8 +214,8 @@ public class QOIImageReader extends ImageReader {
 		totalPixels = width * height;
 		pixelsDone = 0;
 
-		int lineStride = width;
-		int totalBytes = totalPixels;
+		int lineStride   = width;
+		int totalSamples = totalPixels;
 
 		WritableRaster raster = theImage.getWritableTile(0, 0);
 
@@ -226,7 +226,7 @@ public class QOIImageReader extends ImageReader {
 		if (dataBuffer.getDataType() == DataBuffer.TYPE_BYTE) {
 			bytePixels = ((DataBufferByte)dataBuffer).getData();
 			lineStride *= channels;
-			totalBytes *= channels;
+			totalSamples *= channels;
 		} else {
 			intPixels = ((DataBufferInt)dataBuffer).getData();
 		}
@@ -244,7 +244,7 @@ public class QOIImageReader extends ImageReader {
 		updateImageProgress(0);
 
 		int p = 0;
-		while (p < totalBytes) {
+		while (p < totalSamples) {
 			if (p >= nextUpdate) {
 				nextUpdate += lineStride;
 				updateImageProgress(width);
@@ -259,7 +259,9 @@ public class QOIImageReader extends ImageReader {
 			boolean recordHash = true;
 
 			int code = stream.read();
-			if (code == QOI_OP_RGB) {
+			if (code < 0) {
+				break; // EOF reached
+			} else if (code == QOI_OP_RGB) {
 				r = (byte)stream.read();
 				g = (byte)stream.read();
 				b = (byte)stream.read();
@@ -307,7 +309,13 @@ public class QOIImageReader extends ImageReader {
 			if (bytePixels != null) {
 				do {
 					if (channels == 4) {
+						if (p + 3 >= totalSamples) {
+							break;
+						}
+
 						bytePixels[p++] = a;
+					} else if (p + 2 >= totalSamples) {
+						break;
 					}
 					bytePixels[p++] = b;
 					bytePixels[p++] = g;
