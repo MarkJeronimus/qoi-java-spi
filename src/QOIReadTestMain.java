@@ -18,7 +18,7 @@ import org.digitalmodular.qoi.QOIImageReaderSpi;
  * @author Mark Jeronimus
  */
 // Created 2022-05-14
-public class QOITestMain extends JPanel {
+public class QOIReadTestMain extends JPanel {
 	private final BufferedImage image;
 
 	public static void main(String... args) throws IOException {
@@ -31,7 +31,7 @@ public class QOITestMain extends JPanel {
 			JFrame f = new JFrame(filename);
 			f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-			f.setContentPane(new QOITestMain(image));
+			f.setContentPane(new QOIReadTestMain(image));
 
 			f.pack();
 			f.setLocationRelativeTo(null);
@@ -40,7 +40,7 @@ public class QOITestMain extends JPanel {
 	}
 
 	@SuppressWarnings("OverridableMethodCallDuringObjectConstruction")
-	public QOITestMain(BufferedImage image) {
+	public QOIReadTestMain(BufferedImage image) {
 		super(null);
 		setBackground(Color.WHITE);
 		setPreferredSize(new Dimension(image.getWidth(), image.getHeight()));

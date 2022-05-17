@@ -57,7 +57,7 @@ public class QOIImageReaderSpi extends ImageReaderSpi {
 		int magic = stream.readInt();
 		stream.reset();
 
-		return magic == QOIImageReader.QOI_MAGIC;
+		return magic == QOIImageWriter.QOI_MAGIC;
 	}
 
 	@Override

@@ -23,8 +23,6 @@ import javax.imageio.stream.ImageInputStream;
 // Created 2022-05-14
 @SuppressWarnings({"ConstantConditions", "ReturnOfNull"})
 public class QOIImageReader extends ImageReader {
-	@SuppressWarnings("CharUsedInArithmeticContext")
-	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
 
 	private static final int QOI_OP_RGB   = 0b11111110;
 	private static final int QOI_OP_RGBA  = 0b11111111;
@@ -249,8 +247,8 @@ public class QOIImageReader extends ImageReader {
 				nextUpdate += lineStride;
 				updateImageProgress(width);
 
-			// If read has been aborted, just return. processReadAborted will be called later
-			if (abortRequested()) {
+				// If read has been aborted, just return. processReadAborted will be called later
+				if (abortRequested()) {
 					break;
 				}
 			}
