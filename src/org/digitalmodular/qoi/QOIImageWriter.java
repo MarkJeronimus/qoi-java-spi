@@ -48,17 +48,17 @@ public final class QOIImageWriter extends ImageWriter {
 	private int colorSpace = 0; // Currently unused
 
 	// QOI encoder state
-	private       int     repeatCount    = 0;
-	private       int     lastR          = 0;
-	private       int     lastG          = 0;
-	private       int     lastB          = 0;
-	private       int     lastA          = 255;
-	private final int[][] colorHashTable = new int[64][4];
+	private       int      repeatCount    = 0;
+	private       byte     lastR          = 0;
+	private       byte     lastG          = 0;
+	private       byte     lastB          = 0;
+	private       byte     lastA          = (byte)255;
+	private final byte[][] colorHashTable = new byte[64][4];
 
 	// State for the progress reports
-	/** Number of pixels to read */
+	/** Number of pixels to write */
 	private int totalPixels  = 0;
-	/** Number of pixels read */
+	/** Number of pixels write */
 	private int pixelsDone   = 0;
 	/** Notify image observers once per this amount of work */
 	private int nextUpdateAt = 0;
@@ -129,7 +129,7 @@ public final class QOIImageWriter extends ImageWriter {
 		lastR = 0;
 		lastG = 0;
 		lastB = 0;
-		lastA = 255;
+		lastA = (byte)255;
 
 		if (channels < 1 || channels > 4) {
 			throw new UnsupportedOperationException("Cannot encode image with " + channels + " channels");
@@ -220,11 +220,11 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int pixel = pixels[i];
-				int r     = (pixel >> bitOffsets[0]) & 0xFF;
-				int g     = (pixel >> bitOffsets[1]) & 0xFF;
-				int b     = (pixel >> bitOffsets[2]) & 0xFF;
-				encodeColor(r, g, b, 255);
+				int  pixel = pixels[i];
+				byte r     = (byte)(pixel >> bitOffsets[0]);
+				byte g     = (byte)(pixel >> bitOffsets[1]);
+				byte b     = (byte)(pixel >> bitOffsets[2]);
+				encodeColor(r, g, b, (byte)255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
 			for (int i = 0; i < pixels.length; i++) {
@@ -232,11 +232,11 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int pixel = pixels[i];
-				int r     = (pixel >> bitOffsets[0]) & 0xFF;
-				int g     = (pixel >> bitOffsets[1]) & 0xFF;
-				int b     = (pixel >> bitOffsets[2]) & 0xFF;
-				int a     = (pixel >> bitOffsets[3]) & 0xFF;
+				int  pixel = pixels[i];
+				byte r     = (byte)(pixel >> bitOffsets[0]);
+				byte g     = (byte)(pixel >> bitOffsets[1]);
+				byte b     = (byte)(pixel >> bitOffsets[2]);
+				byte a     = (byte)(pixel >> bitOffsets[3]);
 				encodeColor(r, g, b, a);
 			}
 		} else if (channels == 4) {
@@ -261,8 +261,8 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int sample = samples[p++];
-				encodeColor(sample, sample, sample, 255);
+				byte sample = samples[p++];
+				encodeColor(sample, sample, sample, (byte)255);
 			}
 		} else if (srcChannels == 2 && channels == 4) {
 			while (p < samples.length) {
@@ -270,8 +270,8 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int y = samples[p + bandOffsets[0]];
-				int a = samples[p + bandOffsets[1]];
+				byte y = samples[p + bandOffsets[0]];
+				byte a = samples[p + bandOffsets[1]];
 				p += 2;
 				encodeColor(y, y, y, a);
 			}
@@ -281,11 +281,11 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int r = samples[p + bandOffsets[0]];
-				int g = samples[p + bandOffsets[1]];
-				int b = samples[p + bandOffsets[2]];
+				byte r = samples[p + bandOffsets[0]];
+				byte g = samples[p + bandOffsets[1]];
+				byte b = samples[p + bandOffsets[2]];
 				p += 3;
-				encodeColor(r, g, b, 255);
+				encodeColor(r, g, b, (byte)255);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
 			while (p < samples.length) {
@@ -293,10 +293,10 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				int r = samples[p + bandOffsets[0]];
-				int g = samples[p + bandOffsets[1]];
-				int b = samples[p + bandOffsets[2]];
-				int a = samples[p + bandOffsets[3]];
+				byte r = samples[p + bandOffsets[0]];
+				byte g = samples[p + bandOffsets[1]];
+				byte b = samples[p + bandOffsets[2]];
+				byte a = samples[p + bandOffsets[3]];
 				p += 4;
 				encodeColor(r, g, b, a);
 			}
@@ -309,9 +309,9 @@ public final class QOIImageWriter extends ImageWriter {
 		}
 	}
 
-	private void encodeColor(int r, int g, int b, int a) throws IOException {
+	private void encodeColor(byte r, byte g, byte b, byte a) throws IOException {
 		@SuppressWarnings("OverlyComplexArithmeticExpression")
-		int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 63;
+		byte hash = (byte)((r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111);
 
 		if (lastR == r &&
 		    lastG == g &&
@@ -334,9 +334,9 @@ public final class QOIImageWriter extends ImageWriter {
 			} else if (lastA != a) {
 				saveOpRGBA(r, g, b, a);
 			} else {
-				int dr = r - lastR;
-				int dg = g - lastG;
-				int db = b - lastB;
+				byte dr = (byte)(r - lastR);
+				byte dg = (byte)(g - lastG);
+				byte db = (byte)(b - lastB);
 
 				if (dr >= -2 && dr < 2 &&
 				    dg >= -2 && dg < 2 &&
@@ -368,14 +368,14 @@ public final class QOIImageWriter extends ImageWriter {
 		colorHashTable[hash][3] = a;
 	}
 
-	private void saveOpRGB(int r, int g, int b) throws IOException {
+	private void saveOpRGB(byte r, byte g, byte b) throws IOException {
 		stream.writeByte(QOI_OP_RGB);
 		stream.writeByte(r);
 		stream.writeByte(g);
 		stream.writeByte(b);
 	}
 
-	private void saveOpRGBA(int r, int g, int b, int a) throws IOException {
+	private void saveOpRGBA(byte r, byte g, byte b, byte a) throws IOException {
 		stream.writeByte(QOI_OP_RGBA);
 		stream.writeByte(r);
 		stream.writeByte(g);
@@ -383,15 +383,15 @@ public final class QOIImageWriter extends ImageWriter {
 		stream.writeByte(a);
 	}
 
-	private void saveOpIndex(int index) throws IOException {
+	private void saveOpIndex(byte index) throws IOException {
 		stream.writeByte(QOI_OP_INDEX | index);
 	}
 
-	private void saveOpDiff(int dr, int dg, int db) throws IOException {
+	private void saveOpDiff(byte dr, byte dg, byte db) throws IOException {
 		stream.writeByte(QOI_OP_DIFF | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2));
 	}
 
-	private void saveOpLuma(int dr, int dg, int db) throws IOException {
+	private void saveOpLuma(byte dr, byte dg, byte db) throws IOException {
 		stream.writeByte(QOI_OP_LUMA | (dg + 32));
 		stream.writeByte((dr + 8) << 4 | (db + 8));
 	}
@@ -425,7 +425,7 @@ public final class QOIImageWriter extends ImageWriter {
 			pixelsDone += width;
 			processImageProgress(pixelsDone * 100.0f / totalPixels);
 
-			// If read has been aborted, just return. processReadAborted will be called later
+			// If write has been aborted, just return. processWriteAborted will be called later
 			return abortRequested();
 		}
 		return false;

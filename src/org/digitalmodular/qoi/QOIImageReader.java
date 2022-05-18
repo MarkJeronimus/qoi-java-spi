@@ -282,7 +282,7 @@ public class QOIImageReader extends ImageReader {
 
 			if (recordHash) {
 				@SuppressWarnings("OverlyComplexArithmeticExpression")
-				int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 63;
+				int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111;
 				colorHashTable[hash][0] = r;
 				colorHashTable[hash][1] = g;
 				colorHashTable[hash][2] = b;

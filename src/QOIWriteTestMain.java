@@ -33,7 +33,7 @@ import org.digitalmodular.qoi.QOIImageWriterSpi;
 public class QOIWriteTestMain extends JPanel {
 	@SuppressWarnings({"StaticVariableMayNotBeInitialized", "StaticCollection"})
 	private static List<Path> files;
-	private        int        fileIndex = 1;
+	private        int        fileIndex = 4;
 
 	private BufferedImage image1 = null;
 	private BufferedImage image2 = null;
@@ -43,7 +43,8 @@ public class QOIWriteTestMain extends JPanel {
 		IIORegistry.getDefaultInstance().registerServiceProvider(new QOIImageWriterSpi());
 		// QOI Encoding business is in convertImage()
 
-		Path dir = Paths.get("pngsuite/");
+//		Path dir = Paths.get("pngsuite/");
+		Path dir = Paths.get("qoi_test_images/");
 
 		try (Stream<Path> stream = Files.list(dir)) {
 			files = stream.filter(file -> !Files.isDirectory(file))
@@ -101,10 +102,12 @@ public class QOIWriteTestMain extends JPanel {
 	}
 
 	private void convertImage() {
-		File qoiFile = new File("temp.qoi");
+		Path   file     = files.get(fileIndex);
+		String filename = file.getFileName().toString();
+		File   qoiFile  = file.getParent().resolve(filename.substring(0, filename.length() - 4) + ".qoi1").toFile();
 
 		try {
-			image1 = ImageIO.read(files.get(fileIndex).toFile()); // PNG
+			image1 = ImageIO.read(file.toFile()); // PNG
 			ImageIO.write(image1, "qoi", qoiFile);     // QOI
 			image2 = ImageIO.read(qoiFile);                       // QOI
 		} catch (IOException ex) {
@@ -114,7 +117,7 @@ public class QOIWriteTestMain extends JPanel {
 
 		Frame topLevelAncestor = (Frame)getTopLevelAncestor();
 		if (topLevelAncestor != null) {
-			topLevelAncestor.setTitle(fileIndex + ": " + files.get(fileIndex).getFileName().toString());
+			topLevelAncestor.setTitle(fileIndex + ": " + filename);
 		}
 	}
 
