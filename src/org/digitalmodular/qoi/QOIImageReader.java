@@ -274,7 +274,7 @@ public class QOIImageReader extends ImageReader {
 					code = stream.read();
 					r += dg + (code >> 4 & 0b00001111) - 8;
 					b += dg + (code & 0b00001111) - 8;
-				} else {//if (op2 == QOI_OP_RUN) {
+				} else /*if (op2 == QOIImageWriter.QOI_OP_RUN)*/ {
 					runLength = (code & 0b00111111) + 1;
 					recordHash = false;
 				}

@@ -311,12 +311,9 @@ public final class QOIImageWriter extends ImageWriter {
 
 	private void encodeColor(byte r, byte g, byte b, byte a) throws IOException {
 		@SuppressWarnings("OverlyComplexArithmeticExpression")
-		byte hash = (byte)((r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111);
+		int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111;
 
-		if (lastR == r &&
-		    lastG == g &&
-		    lastB == b &&
-		    lastA == a) {
+		if (lastR == r && lastG == g && lastB == b && lastA == a) {
 			repeatCount++;
 			if (repeatCount == 62) {
 				saveOpRun();
@@ -326,11 +323,9 @@ public final class QOIImageWriter extends ImageWriter {
 				saveOpRun();
 			}
 
-			if (colorHashTable[hash][0] == r &&
-			    colorHashTable[hash][1] == g &&
-			    colorHashTable[hash][2] == b &&
-			    colorHashTable[hash][3] == a) {
-				saveOpIndex(hash);
+			if (colorHashTable[hash][0] == r && colorHashTable[hash][1] == g &&
+			    colorHashTable[hash][2] == b && colorHashTable[hash][3] == a) {
+				saveOpIndex((byte)hash);
 			} else if (lastA != a) {
 				saveOpRGBA(r, g, b, a);
 			} else {
@@ -415,7 +410,6 @@ public final class QOIImageWriter extends ImageWriter {
 		stream.writeByte(0x00);
 		stream.writeByte(0x00);
 		stream.writeByte(0x01);
-
 	}
 
 	private boolean checkUpdateAndAbort(int progressPosition, int progressInterval) {

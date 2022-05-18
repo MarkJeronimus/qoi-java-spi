@@ -107,9 +107,9 @@ public class QOIWriteTestMain extends JPanel {
 		File   qoiFile  = file.getParent().resolve(filename.substring(0, filename.length() - 4) + ".qoi1").toFile();
 
 		try {
-			image1 = ImageIO.read(file.toFile()); // PNG
-			ImageIO.write(image1, "qoi", qoiFile);     // QOI
-			image2 = ImageIO.read(qoiFile);                       // QOI
+			image1 = ImageIO.read(file.toFile());  // PNG
+			ImageIO.write(image1, "qoi", qoiFile); // QOI
+			image2 = ImageIO.read(qoiFile);        // QOI
 		} catch (IOException ex) {
 			ex.printStackTrace();
 			System.exit(1);
