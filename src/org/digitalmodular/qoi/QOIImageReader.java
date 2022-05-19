@@ -276,7 +276,7 @@ public class QOIImageReader extends ImageReader {
 					b += dg + (code & 0b00001111) - 8;
 				} else /*if (op2 == QOIImageWriter.QOI_OP_RUN)*/ {
 					runLength = (code & 0b00111111) + 1;
-					recordHash = false;
+					recordHash = p == 0;
 				}
 			}
 
