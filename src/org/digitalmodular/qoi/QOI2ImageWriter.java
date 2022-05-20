@@ -327,9 +327,6 @@ public final class QOI2ImageWriter extends ImageWriter {
 
 		if (lastR == r && lastG == g && lastB == b && lastA == a) {
 			repeatCount++;
-			if (repeatCount == 62) {
-				saveOpRun();
-			}
 			recordRecent = p == 0;
 		} else {
 			if (repeatCount != 0) {
@@ -413,10 +410,15 @@ public final class QOI2ImageWriter extends ImageWriter {
 	}
 
 	private void saveOpRun() throws IOException {
-		statRun[repeatCount - 1]++;
-		if (debugging)
-			System.out.printf("OP_RUN  (%3d)\n", repeatCount - 1);
-		stream.writeByte(QOI_OP_RUN | (repeatCount - 1));
+		repeatCount--;
+		do {
+			int code = repeatCount % 62;
+			statRun[code]++;
+			if (debugging)
+				System.out.printf("OP_RUN  (%3d)\n", code);
+			stream.writeByte(QOI_OP_RUN | code);
+			repeatCount = ((repeatCount - code) / 62) - 1;
+		} while (repeatCount >= 0);
 		repeatCount = 0;
 	}
 

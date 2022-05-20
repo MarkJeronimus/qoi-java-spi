@@ -228,6 +228,7 @@ public class QOI2ImageReader extends ImageReader {
 		byte     g                 = 0;
 		byte     b                 = 0;
 		byte     a                 = (byte)255;
+		int      repeatMultiplier  = 1;
 		byte[][] recentColorsList  = new byte[64][4];
 		int      recentColorsIndex = 0;
 
@@ -239,8 +240,9 @@ public class QOI2ImageReader extends ImageReader {
 				break;
 			}
 
-			int     repeatCount  = 1;
-			boolean recordRecent = true;
+			int     repeatCount           = 1;
+			boolean resetRepeatMultiplier = true;
+			boolean recordRecent          = true;
 
 			int code = stream.read();
 			if (code < 0) {
@@ -276,10 +278,16 @@ public class QOI2ImageReader extends ImageReader {
 					r += dg + (code >> 4 & 0b00001111) - 8;
 					b += dg + (code & 0b00001111) - 8;
 				} else /*if (op2 == QOIImageWriter.QOI_OP_RUN)*/ {
-					repeatCount = (code & 0b00111111) + 1;
+					repeatCount = ((code & 0b00111111) + 1) * repeatMultiplier;
 
 					recordRecent = p == 0;
+					repeatMultiplier *= 62;
+					resetRepeatMultiplier = false;
 				}
+			}
+
+			if (resetRepeatMultiplier) {
+				repeatMultiplier = 1;
 			}
 
 			if (recordRecent) {
