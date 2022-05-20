@@ -29,9 +29,9 @@ import javax.imageio.stream.ImageOutputStream;
  */
 // Created 2022-05-16
 @SuppressWarnings({"ConstantConditions", "OverlyComplexClass", "ReturnOfNull", "UseOfSystemOutOrSystemErr"})
-public final class QOIImageWriter extends ImageWriter {
+public final class QOI2ImageWriter extends ImageWriter {
 	@SuppressWarnings("CharUsedInArithmeticContext")
-	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
+	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | '2'; // "qoi2", big-endian
 
 	@SuppressWarnings("PublicField")
 	public static boolean debugging = false;
@@ -75,7 +75,7 @@ public final class QOIImageWriter extends ImageWriter {
 	private       int   statDiff  = 0;
 	private       int   statIndex = 0;
 
-	public QOIImageWriter(ImageWriterSpi originatingProvider) {
+	public QOI2ImageWriter(ImageWriterSpi originatingProvider) {
 		super(originatingProvider);
 	}
 
@@ -260,7 +260,6 @@ public final class QOIImageWriter extends ImageWriter {
 		}
 	}
 
-	@SuppressWarnings("ValueOfIncrementOrDecrementUsed")
 	private void encodeComponentColorModelImage(Raster raster, int srcChannels) throws IOException {
 		byte[] samples     = ((DataBufferByte)raster.getDataBuffer()).getData();
 		int[]  bandOffsets = ((ComponentSampleModel)raster.getSampleModel()).getBandOffsets();
@@ -273,8 +272,9 @@ public final class QOIImageWriter extends ImageWriter {
 					break;
 				}
 
-				byte sample = samples[p++];
+				byte sample = samples[p];
 				encodeColor(sample, sample, sample, (byte)255);
+				p++;
 			}
 		} else if (srcChannels == 2 && channels == 4) {
 			while (p < samples.length) {
@@ -284,8 +284,8 @@ public final class QOIImageWriter extends ImageWriter {
 
 				byte y = samples[p + bandOffsets[0]];
 				byte a = samples[p + bandOffsets[1]];
-				p += 2;
 				encodeColor(y, y, y, a);
+				p += 2;
 			}
 		} else if (srcChannels == 3 && channels == 3) {
 			while (p < samples.length) {
@@ -296,8 +296,8 @@ public final class QOIImageWriter extends ImageWriter {
 				byte r = samples[p + bandOffsets[0]];
 				byte g = samples[p + bandOffsets[1]];
 				byte b = samples[p + bandOffsets[2]];
-				p += 3;
 				encodeColor(r, g, b, (byte)255);
+				p += 3;
 			}
 		} else if (srcChannels == 4 && channels == 4) {
 			while (p < samples.length) {
@@ -309,8 +309,8 @@ public final class QOIImageWriter extends ImageWriter {
 				byte g = samples[p + bandOffsets[1]];
 				byte b = samples[p + bandOffsets[2]];
 				byte a = samples[p + bandOffsets[3]];
-				p += 4;
 				encodeColor(r, g, b, a);
+				p += 4;
 			}
 		} else if (channels == 4) {
 			throw new UnsupportedOperationException(
@@ -379,12 +379,7 @@ public final class QOIImageWriter extends ImageWriter {
 	private void saveOpRGBA(byte r, byte g, byte b, byte a, int hash) throws IOException {
 		statRGBA++;
 		if (debugging)
-			System.out.printf("OP_RGBA (%3d, %3d, %3d, %3d) (hash=%2d)\n",
-			                  r & 0xFF,
-			                  g & 0xFF,
-			                  b & 0xFF,
-			                  a & 0xFF,
-			                  hash);
+			System.out.printf("OP_RGBA (%3d, %3d, %3d, %3d) (hash=%2d)\n", r & 0xFF, g & 0xFF, b & 0xFF, a & 0xFF, hash);
 		stream.writeByte(QOI_OP_RGBA);
 		stream.writeByte(r);
 		stream.writeByte(g);
@@ -405,7 +400,7 @@ public final class QOIImageWriter extends ImageWriter {
 	private void saveOpRun() throws IOException {
 		statRun[repeatCount - 1]++;
 		if (debugging)
-			System.out.printf("OP_RUN  (%d)\n", repeatCount - 1);
+			System.out.printf("OP_RUN  (%3d)\n", repeatCount - 1);
 		stream.writeByte(QOI_OP_RUN | (repeatCount - 1));
 		repeatCount = 0;
 	}

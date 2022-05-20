@@ -24,7 +24,11 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import org.digitalmodular.qoi.QOI2ImageReaderSpi;
+import org.digitalmodular.qoi.QOI2ImageWriter;
+import org.digitalmodular.qoi.QOI2ImageWriterSpi;
 import org.digitalmodular.qoi.QOIImageReaderSpi;
+import org.digitalmodular.qoi.QOIImageWriter;
 import org.digitalmodular.qoi.QOIImageWriterSpi;
 
 /**
@@ -45,6 +49,10 @@ public class QOIWriteTestMain extends JPanel {
 	public static void main(String... args) throws IOException {
 		IIORegistry.getDefaultInstance().registerServiceProvider(new QOIImageReaderSpi());
 		IIORegistry.getDefaultInstance().registerServiceProvider(new QOIImageWriterSpi());
+		IIORegistry.getDefaultInstance().registerServiceProvider(new QOI2ImageReaderSpi());
+		IIORegistry.getDefaultInstance().registerServiceProvider(new QOI2ImageWriterSpi());
+		QOIImageWriter.debugging = true;
+		QOI2ImageWriter.debugging = true;
 
 		// QOI Encoding business is in convertImage()
 
@@ -116,7 +124,7 @@ public class QOIWriteTestMain extends JPanel {
 	}
 
 	private void convertImage() {
-		String format   = "qoi";
+		String format   = "qoi2";
 		Path   file     = files.get(fileIndex);
 		String filename = file.getFileName().toString();
 		filename = filename.substring(0, filename.length() - 4) + '.' + format;
