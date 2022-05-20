@@ -38,7 +38,9 @@ public final class QOI2ImageWriter extends ImageWriter {
 
 	static final int QOI_OP_RGBA  = 0b11111111; // 11111111 R_______ G_______ B_______ A_______
 	static final int QOI_OP_RGB   = 0b11111110; // 11111110 R_______ G_______ B_______
-	static final int QOI_OP_RUN   = 0b11000000; // 11Repeat (62 values)
+	static final int QOI_OP_A     = 0b11111101; // 11111101 A________
+	static final int QOI_OP_DELTA = 0b11111100; // 11111100 Dr__Dg__ Db__Da__
+	static final int QOI_OP_RUN   = 0b11000000; // 11Repeat (60 values)
 	static final int QOI_OP_LUMA  = 0b10000000; // 10Dy____ Du__Dv__
 	static final int QOI_OP_DIFF  = 0b01000000; // 01DrDgDb
 	static final int QOI_OP_INDEX = 0b00000000; // 00Index_
@@ -71,9 +73,11 @@ public final class QOI2ImageWriter extends ImageWriter {
 	// Fun statistics
 	private       int   statRGBA  = 0;
 	private       int   statRGB   = 0;
-	private final int[] statRun   = new int[62];
-	private       int   statLuma  = 0;
+	private       int   statA     = 0;
+	private       int   statDelta = 0;
+	private final int[] statRun   = new int[60];
 	private       int   statDiff  = 0;
+	private       int   statLuma  = 0;
 	private       int   statIndex = 0;
 
 	public QOI2ImageWriter(ImageWriterSpi originatingProvider) {
@@ -325,7 +329,9 @@ public final class QOI2ImageWriter extends ImageWriter {
 	private void encodeColor(byte r, byte g, byte b, byte a, int p) throws IOException {
 		boolean recordRecent = true;
 
-		if (lastR == r && lastG == g && lastB == b && lastA == a) {
+		boolean sameColor = lastR == r && lastG == g && lastB == b;
+		boolean sameAlpha = lastA == a;
+		if (sameColor && sameAlpha) {
 			repeatCount++;
 			recordRecent = p == 0;
 		} else {
@@ -337,9 +343,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 			if (recentColorIndex >= 0) {
 				saveOpIndex((byte)recentColorIndex);
 				recordRecent = false;
-			} else if (lastA != a) {
-				saveOpRGBA(r, g, b, a);
-			} else {
+			} else if (sameAlpha) {
 				byte dr = (byte)(r - lastR);
 				byte dg = (byte)(g - lastG);
 				byte db = (byte)(b - lastB);
@@ -359,6 +363,23 @@ public final class QOI2ImageWriter extends ImageWriter {
 						saveOpLuma(dg, dr, db);
 					} else {
 						saveOpRGB(r, g, b);
+					}
+				}
+			} else { // Not same alpha
+				if (sameColor) {
+					saveOpA(a);
+				} else {
+					byte dr = (byte)(r - lastR);
+					byte dg = (byte)(g - lastG);
+					byte db = (byte)(b - lastB);
+					byte da = (byte)(a - lastA);
+					if (dr >= -8 && dr < 8 &&
+					    dg >= -8 && dg < 8 &&
+					    db >= -8 && db < 8 &&
+					    da >= -8 && da < 8) {
+						saveOpDelta(dr, dg, db, da);
+					} else {
+						saveOpRGBA(r, g, b, a);
 					}
 				}
 			}
@@ -409,15 +430,32 @@ public final class QOI2ImageWriter extends ImageWriter {
 		stream.writeByte(b);
 	}
 
+	private void saveOpA(byte a) throws IOException {
+		statA++;
+		if (debugging)
+			System.out.printf("OP_A    (%3d)\n", a & 0xFF);
+		stream.writeByte(QOI_OP_A);
+		stream.writeByte(a);
+	}
+
+	private void saveOpDelta(byte dr, byte dg, byte db, byte da) throws IOException {
+		statDelta++;
+		if (debugging)
+			System.out.printf("OP_DELTA(%3d, %3d, %3d, %3d)\n", dg, dr, db, da);
+		stream.writeByte(QOI_OP_DELTA);
+		stream.writeByte((dr + 8) << 4 | (dg + 8));
+		stream.writeByte((db + 8) << 4 | (da + 8));
+	}
+
 	private void saveOpRun() throws IOException {
 		repeatCount--;
 		do {
-			int code = repeatCount % 62;
+			int code = repeatCount % 60;
 			statRun[code]++;
 			if (debugging)
 				System.out.printf("OP_RUN  (%3d)\n", code);
 			stream.writeByte(QOI_OP_RUN | code);
-			repeatCount = ((repeatCount - code) / 62) - 1;
+			repeatCount = ((repeatCount - code) / 60) - 1;
 		} while (repeatCount >= 0);
 		repeatCount = 0;
 	}
@@ -463,6 +501,8 @@ public final class QOI2ImageWriter extends ImageWriter {
 			System.out.println("Statistics:");
 			System.out.println("  RGBA : " + statRGBA);
 			System.out.println("  RGB  : " + statRGB);
+			System.out.println("  A    : " + statA);
+			System.out.println("  Delta: " + statDelta);
 			System.out.println("  Run  : " + Arrays.toString(statRun));
 			System.out.println("  Luma : " + statLuma);
 			System.out.println("  Diff : " + statDiff);

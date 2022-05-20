@@ -256,6 +256,15 @@ public class QOI2ImageReader extends ImageReader {
 				r = (byte)stream.read();
 				g = (byte)stream.read();
 				b = (byte)stream.read();
+			} else if (code == QOI2ImageWriter.QOI_OP_A) {
+				a = (byte)stream.read();
+			} else if (code == QOI2ImageWriter.QOI_OP_DELTA) {
+				code = stream.read();
+				r += (code >> 4 & 0b00001111) - 8;
+				g += (code & 0b00001111) - 8;
+				code = stream.read();
+				b += (code >> 4 & 0b00001111) - 8;
+				a += (code & 0b00001111) - 8;
 			} else {
 				int op2 = code & 0b11000000;
 
@@ -281,7 +290,7 @@ public class QOI2ImageReader extends ImageReader {
 					repeatCount = ((code & 0b00111111) + 1) * repeatMultiplier;
 
 					recordRecent = p == 0;
-					repeatMultiplier *= 62;
+					repeatMultiplier *= 60;
 					resetRepeatMultiplier = false;
 				}
 			}
