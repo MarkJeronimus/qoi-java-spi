@@ -224,11 +224,12 @@ public class QOI2ImageReader extends ImageReader {
 			intPixels = ((DataBufferInt)dataBuffer).getData();
 		}
 
-		byte     r              = 0;
-		byte     g              = 0;
-		byte     b              = 0;
-		byte     a              = (byte)255;
-		byte[][] colorHashTable = new byte[64][4];
+		byte     r                 = 0;
+		byte     g                 = 0;
+		byte     b                 = 0;
+		byte     a                 = (byte)255;
+		byte[][] recentColorsList  = new byte[64][4];
+		int      recentColorsIndex = 0;
 
 		processPassStarted(theImage, 0, 0, 0, 0, 0, 1, 1, null);
 
@@ -238,8 +239,8 @@ public class QOI2ImageReader extends ImageReader {
 				break;
 			}
 
-			int     repeatCount = 1;
-			boolean recordHash  = true;
+			int     repeatCount  = 1;
+			boolean recordRecent = true;
 
 			int code = stream.read();
 			if (code < 0) {
@@ -258,12 +259,12 @@ public class QOI2ImageReader extends ImageReader {
 
 				if (op2 == QOI2ImageWriter.QOI_OP_INDEX) {
 					code &= 0b00111111;
-					byte[] c = colorHashTable[code];
+					byte[] c = recentColorsList[code];
 					r = c[0];
 					g = c[1];
 					b = c[2];
 					a = c[3];
-					recordHash = false;
+					recordRecent = false;
 				} else if (op2 == QOI2ImageWriter.QOI_OP_DIFF) {
 					r += (code >> 4 & 0b00000011) - 2;
 					g += (code >> 2 & 0b00000011) - 2;
@@ -277,17 +278,16 @@ public class QOI2ImageReader extends ImageReader {
 				} else /*if (op2 == QOIImageWriter.QOI_OP_RUN)*/ {
 					repeatCount = (code & 0b00111111) + 1;
 
-					recordHash = p == 0;
+					recordRecent = p == 0;
 				}
 			}
 
-			if (recordHash) {
-				@SuppressWarnings("OverlyComplexArithmeticExpression")
-				int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111;
-				colorHashTable[hash][0] = r;
-				colorHashTable[hash][1] = g;
-				colorHashTable[hash][2] = b;
-				colorHashTable[hash][3] = a;
+			if (recordRecent) {
+				recentColorsList[recentColorsIndex][0] = r;
+				recentColorsList[recentColorsIndex][1] = g;
+				recentColorsList[recentColorsIndex][2] = b;
+				recentColorsList[recentColorsIndex][3] = a;
+				recentColorsIndex = (recentColorsIndex + 1) & 63;
 			}
 
 			if (bytePixels != null) {

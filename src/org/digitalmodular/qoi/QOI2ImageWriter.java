@@ -52,12 +52,13 @@ public final class QOI2ImageWriter extends ImageWriter {
 	private int colorSpace = 0; // Currently unused
 
 	// QOI encoder state
-	private       byte     lastR          = 0;
-	private       byte     lastG          = 0;
-	private       byte     lastB          = 0;
-	private       byte     lastA          = (byte)255;
-	private       int      repeatCount    = 0;
-	private final byte[][] colorHashTable = new byte[64][4];
+	private       byte     lastR             = 0;
+	private       byte     lastG             = 0;
+	private       byte     lastB             = 0;
+	private       byte     lastA             = (byte)255;
+	private       int      repeatCount       = 0;
+	private final byte[][] recentColorsList  = new byte[64][4];
+	private       int      recentColorsIndex = 0;
 
 	// State for the progress reports
 	/** Number of pixels to write */
@@ -236,7 +237,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				byte r     = (byte)(pixel >> bitOffsets[0]);
 				byte g     = (byte)(pixel >> bitOffsets[1]);
 				byte b     = (byte)(pixel >> bitOffsets[2]);
-				encodeColor(r, g, b, (byte)255);
+				encodeColor(r, g, b, (byte)255, i);
 			}
 		} else if (srcChannels == 4 && channels == 4) {
 			for (int i = 0; i < pixels.length; i++) {
@@ -249,7 +250,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				byte g     = (byte)(pixel >> bitOffsets[1]);
 				byte b     = (byte)(pixel >> bitOffsets[2]);
 				byte a     = (byte)(pixel >> bitOffsets[3]);
-				encodeColor(r, g, b, a);
+				encodeColor(r, g, b, a, i);
 			}
 		} else if (channels == 4) {
 			throw new UnsupportedOperationException(
@@ -273,7 +274,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				}
 
 				byte sample = samples[p];
-				encodeColor(sample, sample, sample, (byte)255);
+				encodeColor(sample, sample, sample, (byte)255, p);
 				p++;
 			}
 		} else if (srcChannels == 2 && channels == 4) {
@@ -284,7 +285,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 
 				byte y = samples[p + bandOffsets[0]];
 				byte a = samples[p + bandOffsets[1]];
-				encodeColor(y, y, y, a);
+				encodeColor(y, y, y, a, p);
 				p += 2;
 			}
 		} else if (srcChannels == 3 && channels == 3) {
@@ -296,7 +297,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				byte r = samples[p + bandOffsets[0]];
 				byte g = samples[p + bandOffsets[1]];
 				byte b = samples[p + bandOffsets[2]];
-				encodeColor(r, g, b, (byte)255);
+				encodeColor(r, g, b, (byte)255, p);
 				p += 3;
 			}
 		} else if (srcChannels == 4 && channels == 4) {
@@ -309,7 +310,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				byte g = samples[p + bandOffsets[1]];
 				byte b = samples[p + bandOffsets[2]];
 				byte a = samples[p + bandOffsets[3]];
-				encodeColor(r, g, b, a);
+				encodeColor(r, g, b, a, p);
 				p += 4;
 			}
 		} else if (channels == 4) {
@@ -321,25 +322,26 @@ public final class QOI2ImageWriter extends ImageWriter {
 		}
 	}
 
-	private void encodeColor(byte r, byte g, byte b, byte a) throws IOException {
-		@SuppressWarnings("OverlyComplexArithmeticExpression")
-		int hash = (r * 3 + g * 5 + b * 7 + a * 11) & 0b00111111;
+	private void encodeColor(byte r, byte g, byte b, byte a, int p) throws IOException {
+		boolean recordRecent = true;
 
 		if (lastR == r && lastG == g && lastB == b && lastA == a) {
 			repeatCount++;
 			if (repeatCount == 62) {
 				saveOpRun();
 			}
+			recordRecent = p == 0;
 		} else {
 			if (repeatCount != 0) {
 				saveOpRun();
 			}
 
-			if (colorHashTable[hash][0] == r && colorHashTable[hash][1] == g &&
-			    colorHashTable[hash][2] == b && colorHashTable[hash][3] == a) {
-				saveOpIndex((byte)hash);
+			int recentColorIndex = findRecentColor(r, g, b, a);
+			if (recentColorIndex >= 0) {
+				saveOpIndex((byte)recentColorIndex);
+				recordRecent = false;
 			} else if (lastA != a) {
-				saveOpRGBA(r, g, b, a, hash);
+				saveOpRGBA(r, g, b, a);
 			} else {
 				byte dr = (byte)(r - lastR);
 				byte dg = (byte)(g - lastG);
@@ -348,7 +350,7 @@ public final class QOI2ImageWriter extends ImageWriter {
 				if (dg >= -2 && dg < 2 && // Ordered by largest chance to fail this test
 				    dr >= -2 && dr < 2 &&
 				    db >= -2 && db < 2) {
-					saveOpDiff(dr, dg, db, hash);
+					saveOpDiff(dr, dg, db);
 				} else {
 					//        // dg is now dy (Y in YUV)
 					dr -= dg; // dr is now du (U in YUV)
@@ -357,9 +359,9 @@ public final class QOI2ImageWriter extends ImageWriter {
 					if (dr >= -8 && dr < 8 && // Ordered by largest chance to fail this test
 					    db >= -8 && db < 8 &&
 					    dg >= -32 && dg < 32) {
-						saveOpLuma(dg, dr, db, hash);
+						saveOpLuma(dg, dr, db);
 					} else {
-						saveOpRGB(r, g, b, hash);
+						saveOpRGB(r, g, b);
 					}
 				}
 			}
@@ -370,16 +372,29 @@ public final class QOI2ImageWriter extends ImageWriter {
 		lastB = b;
 		lastA = a;
 
-		colorHashTable[hash][0] = r;
-		colorHashTable[hash][1] = g;
-		colorHashTable[hash][2] = b;
-		colorHashTable[hash][3] = a;
+		if (recordRecent) {
+			recentColorsList[recentColorsIndex][0] = r;
+			recentColorsList[recentColorsIndex][1] = g;
+			recentColorsList[recentColorsIndex][2] = b;
+			recentColorsList[recentColorsIndex][3] = a;
+			recentColorsIndex = (recentColorsIndex + 1) & 63;
+		}
 	}
 
-	private void saveOpRGBA(byte r, byte g, byte b, byte a, int hash) throws IOException {
+	private int findRecentColor(byte r, byte g, byte b, byte a) {
+		for (int i = 0; i < 64; i++) {
+			if (recentColorsList[i][0] == r && recentColorsList[i][1] == g &&
+			    recentColorsList[i][2] == b && recentColorsList[i][3] == a) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private void saveOpRGBA(byte r, byte g, byte b, byte a) throws IOException {
 		statRGBA++;
 		if (debugging)
-			System.out.printf("OP_RGBA (%3d, %3d, %3d, %3d) (hash=%2d)\n", r & 0xFF, g & 0xFF, b & 0xFF, a & 0xFF, hash);
+			System.out.printf("OP_RGBA (%3d, %3d, %3d, %3d)\n", r & 0xFF, g & 0xFF, b & 0xFF, a & 0xFF);
 		stream.writeByte(QOI_OP_RGBA);
 		stream.writeByte(r);
 		stream.writeByte(g);
@@ -387,10 +402,10 @@ public final class QOI2ImageWriter extends ImageWriter {
 		stream.writeByte(a);
 	}
 
-	private void saveOpRGB(byte r, byte g, byte b, int hash) throws IOException {
+	private void saveOpRGB(byte r, byte g, byte b) throws IOException {
 		statRGB++;
 		if (debugging)
-			System.out.printf("OP_RGB  (%3d, %3d, %3d)      (hash=%2d)\n", r & 0xFF, g & 0xFF, b & 0xFF, hash);
+			System.out.printf("OP_RGB  (%3d, %3d, %3d)\n", r & 0xFF, g & 0xFF, b & 0xFF);
 		stream.writeByte(QOI_OP_RGB);
 		stream.writeByte(r);
 		stream.writeByte(g);
@@ -405,18 +420,18 @@ public final class QOI2ImageWriter extends ImageWriter {
 		repeatCount = 0;
 	}
 
-	private void saveOpLuma(byte dy, byte du, byte dv, int hash) throws IOException {
+	private void saveOpLuma(byte dy, byte du, byte dv) throws IOException {
 		statLuma++;
 		if (debugging)
-			System.out.printf("OP_LUMA (%3d, %3d, %3d)      (hash=%2d)\n", dy, du, dv, hash);
+			System.out.printf("OP_LUMA (%3d, %3d, %3d)\n", dy, du, dv);
 		stream.writeByte(QOI_OP_LUMA | (dy + 32));
 		stream.writeByte((du + 8) << 4 | (dv + 8));
 	}
 
-	private void saveOpDiff(byte dr, byte dg, byte db, int hash) throws IOException {
+	private void saveOpDiff(byte dr, byte dg, byte db) throws IOException {
 		statDiff++;
 		if (debugging)
-			System.out.printf("OP_DIFF (%3d, %3d, %3d)      (hash=%2d)\n", dg, dr, db, hash);
+			System.out.printf("OP_DIFF (%3d, %3d, %3d)\n", dg, dr, db);
 		stream.writeByte(QOI_OP_DIFF | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2));
 	}
 
