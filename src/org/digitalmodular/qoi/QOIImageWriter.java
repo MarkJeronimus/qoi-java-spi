@@ -27,17 +27,17 @@ import javax.imageio.stream.ImageOutputStream;
  * @author Mark Jeronimus
  */
 // Created 2022-05-16
-@SuppressWarnings({"ConstantConditions", "ReturnOfNull"})
+@SuppressWarnings({"ConstantConditions", "OverlyComplexClass", "ReturnOfNull"})
 public final class QOIImageWriter extends ImageWriter {
 	@SuppressWarnings("CharUsedInArithmeticContext")
 	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
 
-	static final int QOI_OP_RGB   = 0b11111110;
 	static final int QOI_OP_RGBA  = 0b11111111;
-	static final int QOI_OP_INDEX = 0b00_000000; // Only upper 2 bits used
-	static final int QOI_OP_DIFF  = 0b01_000000; // Only upper 2 bits used
-	static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
+	static final int QOI_OP_RGB   = 0b11111110;
 	static final int QOI_OP_RUN   = 0b11_000000; // Only upper 2 bits used
+	static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
+	static final int QOI_OP_DIFF  = 0b01_000000; // Only upper 2 bits used
+	static final int QOI_OP_INDEX = 0b00_000000; // Only upper 2 bits used
 
 	private ImageOutputStream stream = null;
 
@@ -48,11 +48,11 @@ public final class QOIImageWriter extends ImageWriter {
 	private int colorSpace = 0; // Currently unused
 
 	// QOI encoder state
-	private       int      repeatCount    = 0;
 	private       byte     lastR          = 0;
 	private       byte     lastG          = 0;
 	private       byte     lastB          = 0;
 	private       byte     lastA          = (byte)255;
+	private       int      repeatCount    = 0;
 	private final byte[][] colorHashTable = new byte[64][4];
 
 	// State for the progress reports
@@ -342,9 +342,9 @@ public final class QOIImageWriter extends ImageWriter {
 					db -= dg;
 
 					if (dr >= -8 && dr < 8 &&
-					    dg >= -32 && dg < 32 &&
-					    db >= -8 && db < 8) {
-						saveOpLuma(dr, dg, db);
+					    db >= -8 && db < 8 &&
+					    dg >= -32 && dg < 32) {
+						saveOpLuma(dg, dr, db);
 					} else {
 						saveOpRGB(r, g, b);
 					}
@@ -363,13 +363,6 @@ public final class QOIImageWriter extends ImageWriter {
 		colorHashTable[hash][3] = a;
 	}
 
-	private void saveOpRGB(byte r, byte g, byte b) throws IOException {
-		stream.writeByte(QOI_OP_RGB);
-		stream.writeByte(r);
-		stream.writeByte(g);
-		stream.writeByte(b);
-	}
-
 	private void saveOpRGBA(byte r, byte g, byte b, byte a) throws IOException {
 		stream.writeByte(QOI_OP_RGBA);
 		stream.writeByte(r);
@@ -378,22 +371,29 @@ public final class QOIImageWriter extends ImageWriter {
 		stream.writeByte(a);
 	}
 
-	private void saveOpIndex(byte index) throws IOException {
-		stream.writeByte(QOI_OP_INDEX | index);
+	private void saveOpRGB(byte r, byte g, byte b) throws IOException {
+		stream.writeByte(QOI_OP_RGB);
+		stream.writeByte(r);
+		stream.writeByte(g);
+		stream.writeByte(b);
+	}
+
+	private void saveOpRun() throws IOException {
+		stream.writeByte(QOI_OP_RUN | (repeatCount - 1));
+		repeatCount = 0;
+	}
+
+	private void saveOpLuma(byte dg, byte dr, byte db) throws IOException {
+		stream.writeByte(QOI_OP_LUMA | (dg + 32));
+		stream.writeByte((dr + 8) << 4 | (db + 8));
 	}
 
 	private void saveOpDiff(byte dr, byte dg, byte db) throws IOException {
 		stream.writeByte(QOI_OP_DIFF | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2));
 	}
 
-	private void saveOpLuma(byte dr, byte dg, byte db) throws IOException {
-		stream.writeByte(QOI_OP_LUMA | (dg + 32));
-		stream.writeByte((dr + 8) << 4 | (db + 8));
-	}
-
-	private void saveOpRun() throws IOException {
-		stream.writeByte(QOI_OP_RUN | (repeatCount - 1));
-		repeatCount = 0;
+	private void saveOpIndex(byte index) throws IOException {
+		stream.writeByte(QOI_OP_INDEX | index);
 	}
 
 	private void writeFooter() throws IOException {

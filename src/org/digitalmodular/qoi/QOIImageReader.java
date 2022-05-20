@@ -196,6 +196,7 @@ public class QOIImageReader extends ImageReader {
 		}
 	}
 
+	@SuppressWarnings("ValueOfIncrementOrDecrementUsed")
 	private void decodeImage() throws IOException {
 		// Construct a suitable target image
 		theImage = getDestination(null, getImageTypes(0), width, height);
@@ -238,21 +239,21 @@ public class QOIImageReader extends ImageReader {
 				break;
 			}
 
-			int     runLength  = 1;
-			boolean recordHash = true;
+			int     repeatCount = 1;
+			boolean recordHash  = true;
 
 			int code = stream.read();
 			if (code < 0) {
 				break; // EOF reached
-			} else if (code == QOIImageWriter.QOI_OP_RGB) {
-				r = (byte)stream.read();
-				g = (byte)stream.read();
-				b = (byte)stream.read();
 			} else if (code == QOIImageWriter.QOI_OP_RGBA) {
 				r = (byte)stream.read();
 				g = (byte)stream.read();
 				b = (byte)stream.read();
 				a = (byte)stream.read();
+			} else if (code == QOIImageWriter.QOI_OP_RGB) {
+				r = (byte)stream.read();
+				g = (byte)stream.read();
+				b = (byte)stream.read();
 			} else {
 				int op2 = code & 0b11000000;
 
@@ -275,7 +276,7 @@ public class QOIImageReader extends ImageReader {
 					r += dg + (code >> 4 & 0b00001111) - 8;
 					b += dg + (code & 0b00001111) - 8;
 				} else /*if (op2 == QOIImageWriter.QOI_OP_RUN)*/ {
-					runLength = (code & 0b00111111) + 1;
+					repeatCount = (code & 0b00111111) + 1;
 					recordHash = p == 0;
 				}
 			}
@@ -304,8 +305,8 @@ public class QOIImageReader extends ImageReader {
 					bytePixels[p++] = g;
 					bytePixels[p++] = r;
 
-					runLength--;
-				} while (runLength > 0);
+					repeatCount--;
+				} while (repeatCount > 0);
 			} else if (intPixels != null) {
 				int argb = (((a & 0xFF) << 8 |
 				             (r & 0xFF)) << 8 |
@@ -314,8 +315,8 @@ public class QOIImageReader extends ImageReader {
 				do {
 					intPixels[p++] = argb;
 
-					runLength--;
-				} while (runLength > 0);
+					repeatCount--;
+				} while (repeatCount > 0);
 			}
 		}
 

@@ -61,7 +61,7 @@ public class QOIImageReaderSpi extends ImageReaderSpi {
 	}
 
 	@Override
-	public ImageReader createReaderInstance(Object extension) throws IOException {
+	public ImageReader createReaderInstance(Object extension) {
 		return new QOIImageReader(this);
 	}
 }

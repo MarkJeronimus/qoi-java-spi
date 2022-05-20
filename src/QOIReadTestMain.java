@@ -24,8 +24,8 @@ public class QOIReadTestMain extends JPanel {
 	public static void main(String... args) throws IOException {
 		IIORegistry.getDefaultInstance().registerServiceProvider(new QOIImageReaderSpi());
 
-		String filename = "qoi_test_images/dice.qoi";
-		BufferedImage image = ImageIO.read(new File(filename));
+		String        filename = "qoi_test_images/dice.qoi";
+		BufferedImage image    = ImageIO.read(new File(filename));
 
 		SwingUtilities.invokeLater(() -> {
 			JFrame f = new JFrame(filename);
