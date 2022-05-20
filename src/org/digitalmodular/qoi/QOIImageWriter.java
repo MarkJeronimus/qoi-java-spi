@@ -32,12 +32,12 @@ public final class QOIImageWriter extends ImageWriter {
 	@SuppressWarnings("CharUsedInArithmeticContext")
 	static final int QOI_MAGIC = (('q' << 8 | 'o') << 8 | 'i') << 8 | 'f'; // "qoif", big-endian
 
-	static final int QOI_OP_RGBA  = 0b11111111;
-	static final int QOI_OP_RGB   = 0b11111110;
-	static final int QOI_OP_RUN   = 0b11_000000; // Only upper 2 bits used
-	static final int QOI_OP_LUMA  = 0b10_000000; // Only upper 2 bits used
-	static final int QOI_OP_DIFF  = 0b01_000000; // Only upper 2 bits used
-	static final int QOI_OP_INDEX = 0b00_000000; // Only upper 2 bits used
+	static final int QOI_OP_RGBA  = 0b11111111; // 11111111 R_______ G_______ B_______ A_______
+	static final int QOI_OP_RGB   = 0b11111110; // 11111110 R_______ G_______ B_______
+	static final int QOI_OP_RUN   = 0b11000000; // 11Repeat (62 values)
+	static final int QOI_OP_LUMA  = 0b10000000; // 10Dy____ Du__Dv__
+	static final int QOI_OP_DIFF  = 0b01000000; // 01DrDgDb
+	static final int QOI_OP_INDEX = 0b00000000; // 00Index_
 
 	private ImageOutputStream stream = null;
 
@@ -333,15 +333,16 @@ public final class QOIImageWriter extends ImageWriter {
 				byte dg = (byte)(g - lastG);
 				byte db = (byte)(b - lastB);
 
-				if (dr >= -2 && dr < 2 &&
-				    dg >= -2 && dg < 2 &&
+				if (dg >= -2 && dg < 2 && // Ordered by largest chance to fail this test
+				    dr >= -2 && dr < 2 &&
 				    db >= -2 && db < 2) {
 					saveOpDiff(dr, dg, db);
 				} else {
-					dr -= dg;
-					db -= dg;
+					//        // dg is now dy (Y in YUV)
+					dr -= dg; // dr is now du (U in YUV)
+					db -= dg; // db is now dv (V in YUV)
 
-					if (dr >= -8 && dr < 8 &&
+					if (dr >= -8 && dr < 8 && // Ordered by largest chance to fail this test
 					    db >= -8 && db < 8 &&
 					    dg >= -32 && dg < 32) {
 						saveOpLuma(dg, dr, db);
@@ -383,9 +384,9 @@ public final class QOIImageWriter extends ImageWriter {
 		repeatCount = 0;
 	}
 
-	private void saveOpLuma(byte dg, byte dr, byte db) throws IOException {
-		stream.writeByte(QOI_OP_LUMA | (dg + 32));
-		stream.writeByte((dr + 8) << 4 | (db + 8));
+	private void saveOpLuma(byte dy, byte du, byte dv) throws IOException {
+		stream.writeByte(QOI_OP_LUMA | (dy + 32));
+		stream.writeByte((du + 8) << 4 | (dv + 8));
 	}
 
 	private void saveOpDiff(byte dr, byte dg, byte db) throws IOException {
